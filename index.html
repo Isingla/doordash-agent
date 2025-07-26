@@ -664,13 +664,14 @@
             return filtered.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance)).slice(0, 8);
         }
 
-        // Display restaurant results
+        // Display restaurant results with proper event handling
         function displayRestaurants(restaurants) {
             let response = `🍽️ <strong>Found ${restaurants.length} restaurants near you:</strong><br><br>`;
             
             restaurants.forEach((restaurant, index) => {
+                const restaurantId = `restaurant_${Date.now()}_${index}`;
                 response += `
-                    <div class="restaurant-card" onclick="showRestaurantMenu('${restaurant.name}', ${index})">
+                    <div class="restaurant-card" data-restaurant="${encodeURIComponent(JSON.stringify(restaurant))}" data-index="${index}">
                         <div class="restaurant-name">${restaurant.name}</div>
                         <div class="restaurant-info">
                             ⭐ ${restaurant.rating} • ${restaurant.cuisine} • ${restaurant.price} • 🚗 ${restaurant.time} • 📍 ${restaurant.distance}
@@ -686,27 +687,61 @@
             
             response += "<br>Click any restaurant to see their menu and start ordering! 🛒";
             addMessage(response, false);
+            
+            // Set up click handlers for restaurant cards after message is added
+            setTimeout(() => {
+                const restaurantCards = chatArea.querySelectorAll('.restaurant-card[data-restaurant]');
+                restaurantCards.forEach(card => {
+                    card.addEventListener('click', function() {
+                        try {
+                            const restaurantData = JSON.parse(decodeURIComponent(this.getAttribute('data-restaurant')));
+                            const index = this.getAttribute('data-index');
+                            showRestaurantMenu(restaurantData.name, parseInt(index), restaurantData);
+                        } catch (error) {
+                            console.error('Error handling restaurant click:', error);
+                        }
+                    });
+                });
+            }, 100);
         }
 
-        // Show restaurant menu
-        function showRestaurantMenu(restaurantName, index) {
+        // Show restaurant menu with proper event handling
+        function showRestaurantMenu(restaurantName, index, restaurantData = null) {
             const menuItems = generateMenuItems(restaurantName);
             
             let response = `🍽️ <strong>${restaurantName} - Menu</strong><br><br>`;
             
             menuItems.forEach((item, itemIndex) => {
+                const itemId = `item_${Date.now()}_${itemIndex}`;
                 response += `
-                    <div class="restaurant-card" onclick="addToCart('${restaurantName}', '${item.name}', ${item.price})">
-                        <div class="restaurant-name">${item.name} - $${item.price}</div>
+                    <div class="restaurant-card menu-item-card" data-restaurant="${encodeURIComponent(restaurantName)}" data-item="${encodeURIComponent(JSON.stringify(item))}">
+                        <div class="restaurant-name">${item.name} - ${item.price}</div>
                         <div class="restaurant-info">${item.description}</div>
                         <div class="restaurant-tags">
                             <span class="tag">Click to add</span>
+                            <span class="tag">${item.price}</span>
                         </div>
                     </div>
                 `;
             });
             
             addMessage(response, false);
+            
+            // Set up click handlers for menu items after message is added
+            setTimeout(() => {
+                const menuItemCards = chatArea.querySelectorAll('.menu-item-card[data-item]');
+                menuItemCards.forEach(card => {
+                    card.addEventListener('click', function() {
+                        try {
+                            const restaurantName = decodeURIComponent(this.getAttribute('data-restaurant'));
+                            const itemData = JSON.parse(decodeURIComponent(this.getAttribute('data-item')));
+                            addToCart(restaurantName, itemData.name, itemData.price);
+                        } catch (error) {
+                            console.error('Error handling menu item click:', error);
+                        }
+                    });
+                });
+            }, 100);
         }
 
         // Generate menu items based on restaurant
@@ -763,7 +798,7 @@
             addMessage(`✅ Added ${itemName} from ${restaurant} to your cart! ($${price})`, false);
         }
 
-        // Update cart display
+        // Update cart display with proper event handling
         function updateCartDisplay() {
             const cartItems = document.getElementById('cartItems');
             const cartCount = document.getElementById('cartCount');
@@ -791,8 +826,8 @@
                             <div style="font-weight: 600;">${item.item}</div>
                             <div style="font-size: 0.9em; color: #666;">${item.restaurant}</div>
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                                <span style="font-weight: 600;">$${item.price}</span>
-                                <button onclick="removeFromCart(${index})" style="background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">Remove</button>
+                                <span style="font-weight: 600;">${item.price}</span>
+                                <button class="remove-cart-btn" data-index="${index}" style="background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; cursor: pointer;">Remove</button>
                             </div>
                         </div>
                     `;
@@ -801,14 +836,25 @@
                 cartItems.innerHTML = cartHTML;
                 totalAmount.textContent = (total + 4.99).toFixed(2); // Add delivery fee
                 cartTotal.style.display = 'block';
+                
+                // Set up remove button event handlers
+                const removeButtons = cartItems.querySelectorAll('.remove-cart-btn');
+                removeButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        removeFromCart(index);
+                    });
+                });
             }
         }
 
-        // Remove item from cart
+        // Enhanced remove from cart function
         function removeFromCart(index) {
-            cart.splice(index, 1);
-            updateCartDisplay();
-            addMessage("Item removed from cart!", false);
+            if (index >= 0 && index < cart.length) {
+                cart.splice(index, 1);
+                updateCartDisplay();
+                addMessage("Item removed from cart!", false);
+            }
         }
 
         // Show cart contents
